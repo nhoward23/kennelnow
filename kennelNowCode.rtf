@@ -1,0 +1,352 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf100
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 create or replace PACKAGE body hwswknow\
+IS\
+  --\
+  /*\
+  - Custom procedures for Kennel Now\
+  - This is a just template for Senior Project to explain basic GU programming standard.\
+  */\
+  -- FILE NAME..: hwswmntr.sql [File Name]\
+  -- RELEASE....: 8.7.1        [Release #]\
+  -- OBJECT NAME: HWSWKNOW     [The last four letters stands for KennelNow. I will explain the first four letters in the next meeting\
+  -- PRODUCT....: STUDENT      [Module]\
+  -- USAGE......: KennelNow Atheltics Ticketing\
+  -- COPYRIGHT..: Copyright 1887-2018 Gonzaga University\
+  --\
+  -- DESCRIPTION: This package allows students to activite/deactivate tickets\
+  --\
+  -- Cursors:\
+  --\
+  --\
+  --Package Contents: procedure gu_gamp_homepage\
+  -- AUDIT TRAIL GUVER\
+  -- 1. Initial Complete Release                   SS 17-SEP-2015\
+  -- 2. Implemetation of prototype UI              SV 02-DEC-2018\
+  ------------------------------------------------------------------------------------------------------\
+  ------------------------------------------------------------------------------------------------------\
+  /* Global type and variable declarations for package */\
+  --==============================================================================\
+  -- PROCEDURE GAMP_REGISTRATION (Registration page for students)\
+  --==============================================================================\
+  PROCEDURE GU_KennelNow(\
+      p_id    IN VARCHAR2 DEFAULT NULL,\
+      p_fname IN VARCHAR2 DEFAULT NULL,\
+      p_submit IN VARCHAR2 DEFAULT NULL,\
+      p_ticketStatus IN VARCHAR2 DEFAULT NULL)\
+  IS\
+    --pidm varchar2(10) := '447360';\
+    pidm spriden.spriden_pidm%type;\
+    statusLabel varchar(50);\
+    ticketCount varchar(5);\
+    ticketsAvailable int;\
+    gameName varChar(50);\
+    currPIDMCount int;\
+    \
+    CURSOR c_get_Game_Info\
+    IS\
+--      SELECT DISTINCT ssrmeet_start_date,\
+--         a.*\
+--      FROM gonz.tt_slbevnt a,\
+--        gonz.tt_ssrmeet, ven_senproj1.gerattd ger\
+--      WHERE slbevnt_desc LIKE 'MBB%'\
+--      AND slbevnt_crn         = ssrmeet_crn\
+--      AND ger.gerattd_evnt_crn = slbevnt_crn\
+--      AND ssrmeet_start_date >= '01-SEP-17'\
+--      --AND ger.gerattd_pidm = 478276\
+--      ORDER BY ssrmeet_start_date ASC;\
+      \
+      -- one we did with darren 11/30\
+      /*\
+      SELECT DISTINCT ssrmeet_start_date,\
+         a.*, ger.gerattd_func_code\
+      FROM gonz.tt_slbevnt a \
+      LEFT OUTER JOIN ven_senproj1.gerattd ger ON (ger.gerattd_evnt_crn = slbevnt_crn AND ger.gerattd_pidm = pidm), gonz.tt_ssrmeet\
+      WHERE slbevnt_desc LIKE 'MBB%' \
+      AND slbevnt_crn = ssrmeet_crn\
+      AND ssrmeet_start_date >= '01-SEP-17'\
+      ORDER BY ssrmeet_start_date ASC;\
+      */\
+      \
+      SELECT DISTINCT ssrmeet_start_date,\
+         a.*, ger.gerattd_func_code\
+      FROM gonz.tt_slbevnt a \
+      LEFT OUTER JOIN ven_senproj1.gerattd ger ON (ger.gerattd_evnt_crn = slbevnt_crn AND ger.gerattd_pidm = pidm), gonz.tt_ssrmeet\
+      WHERE slbevnt_desc LIKE 'MBB%' \
+      AND slbevnt_desc LIKE '%BYU%' \
+      --OR slbevnt_desc LIKE '%Pepperdine%' )\
+      AND slbevnt_crn = ssrmeet_crn\
+      AND ssrmeet_start_date >= '01-SEP-17'\
+      ORDER BY ssrmeet_start_date ASC;\
+      \
+      \
+      /*\
+      SELECT ssrmeet_start_date,\
+        a.*\
+      FROM gonz.tt_slbevnt a,\
+        gonz.tt_ssrmeet\
+      WHERE slbevnt_desc LIKE 'MBB%'\
+      AND slbevnt_crn         = ssrmeet_crn\
+      AND ssrmeet_start_date >= '01-SEP-17'\
+      ORDER BY ssrmeet_start_date ASC;\
+      */\
+  BEGIN\
+    dbms_output.put_line(pidm);\
+    IF NOT twbkwbis.F_ValidUser(pidm) THEN\
+       RETURN;\
+    END IF;\
+    \
+    twbkwbis.P_OpenDoc('hwswknow.GU_KennelNow');\
+    htp.p('<form action="hwswknow.GU_KennelNow">');\
+    /*\
+    htp.p('<table>');\
+    htp.p('<tr>');\
+    htp.p('<td>Student ID:</td>');\
+    htp.p('<td><input type="text" name="p_id"  value="'||p_id||'"></td>');\
+    htp.p('<td><input type="submit" value="Search Student"></td>');\
+    htp.p('</tr>');\
+    htp.p('</table>');\
+    htp.p('</form> ');\
+    htp.p('<table>');\
+    */\
+    \
+    \
+   -- htp.p(' <table CLASS="datadisplaytable" summary="This table will contain game information"><caption class="captiontext">Game Information</caption>');\
+\
+    FOR output IN c_get_Game_Info\
+    LOOP\
+    \
+        -- gameName = REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''));\
+        \
+        htp.p(' <table width="1200" CLASS="datadisplaytable" summary="This table will contain game information"><caption class="captiontext">'|| 'MBB vs ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'')|| '</caption>');\
+\
+        if (output.gerattd_func_code IS null OR output.gerattd_func_code = 'NOTICKETS') then\
+             statusLabel := 'No Ticket';\
+        else \
+             statusLabel := 'Ticket';\
+        end if;    \
+        \
+        -- this query gets the count of tickets associated with a given game crn\
+        select count(*) into ticketCount\
+        from gerattd\
+        where gerattd.gerattd_evnt_crn = output.slbevnt_crn\
+        and gerattd.gerattd_func_code = 'TICKETS';\
+        \
+        ticketsAvailable := 1200 - ticketCount;\
+        \
+    /*\
+      htp.p('<tr>');\
+      htp.p('<td>' ||REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'') || '</td>');\
+      htp.p('<td>');\
+      htp.p('<form action="hwswknow.GU_KennelNow">');\
+      htp.p('First name:<br>');\
+      htp.p(' <input type="text" name="p_fname" value="'||p_fname||'">');\
+      htp.p('<br>');\
+      htp.p('Last name:<br>');\
+      htp.p('<input type="text" name="lastname" value="Mouse">');\
+      htp.p('<br><br>');\
+      htp.p('<input type="submit" value="Submit">');\
+      htp.p('</form> ');\
+      htp.p('</td>');\
+      htp.p('</tr>');\
+      \
+    htp.p('</table>');\
+    */\
+    \
+    -- htp.p('<tr>');\
+    -- htp.p('<td colspan="6" CLASS="ntheader" scope="col" >'||REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'') ||'</td>');\
+    -- htp.p('<td colspan="2" CLASS="ntheader" scope="col" font size="30">' || output.ssrmeet_start_date ||'</td>');\
+    -- htp.p('</tr>');\
+    \
+    /*\
+    htp.p('<tr>');\
+    htp.p('<td CLASS="ntlabel" scope="row">Number of tickets Available:</td>');\
+    htp.p('<td CLASS="ntdefault">' || ticketsAvailable ||'</td>');\
+    htp.p('</tr>');\
+    */\
+    \
+    /*\
+    htp.p('<tr>');\
+    htp.p('<td CLASS="ntlabel" scope="row">Your ticket status:</td>');\
+    htp.p('<td CLASS="ntdefault"></td>');\
+    htp.p('<td CLASS="ntdefault">' || statusLabel || '</td>');\
+    htp.p('</tr>');\
+    */\
+    \
+    /*\
+    -- date as element of table\
+    htp.p('<tr>');\
+    htp.p('<td CLASS="ntlabel" scope="row">Date:</td>');\
+    htp.p('<td CLASS="ntdefault">' || output.ssrmeet_start_date ||'</td>');\
+    htp.p('</tr>');\
+    */\
+    \
+    \
+    /*\
+    htp.p('<tr>');\
+    htp.p('<td scope="row">  </td>');\
+    htp.p('</tr>');\
+\
+    htp.p('<tr>');\
+    htp.p('<td scope="row">  </td>');\
+    htp.p('</tr>');\
+\
+    htp.p('<tr>');\
+    htp.p('<td scope="row">  </td>');\
+    htp.p('</tr>');\
+    */\
+    \
+    \
+    htp.p('</table>');\
+    \
+    -- htp.p('<br />');\
+    \
+    htp.p('<div class="infotextdiv">');\
+    htp.p('<table\'a0\'a0CLASS="newForm" SUMMARY="This layout table contains information that may be helpful in understanding the content and functionality of this page.\'a0\'a0It could be a brief set of instructions, a description of error messages, or other special information.>');\
+   \
+   \
+    htp.p('<tr>');\
+    htp.p('<td colspan="10" CLASS="indefault">');\
+    htp.p('<SPAN class="newText">Date:   </SPAN>');\
+    htp.p('<SPAN class="newText">' || output.ssrmeet_start_date ||'</SPAN>');\
+    htp.p('</td>');\
+    htp.p('</tr>');\
+    \
+    /*\
+     htp.p('<tr>');\
+    htp.p('<td CLASS="ntlabel" scope="row">Number of tickets Available:</td>');\
+    htp.p('<td CLASS="ntdefault">' || ticketsAvailable ||'</td>');\
+    htp.p('</tr>');\
+    */\
+    \
+    htp.p('<br />');\
+    \
+    \
+    htp.p('<tr>');\
+    htp.p('<td CLASS="indefault">');\
+    htp.p('<SPAN class="newText">Number of tickets Available:  </SPAN>');\
+    htp.p('<SPAN class="newText">' || ticketsAvailable ||'</SPAN>');\
+    htp.p('</td>');\
+    htp.p('</tr>');\
+    \
+\
+    \
+    \
+\
+    \
+    \
+\
+    \
+    /*\
+     htp.p('<tr>');\
+    htp.p('<td CLASS="ntlabel" scope="row">Your ticket status:</td>');\
+    htp.p('<td CLASS="ntdefault"></td>');\
+    htp.p('<td CLASS="ntdefault">' || statusLabel || '</td>');\
+    htp.p('</tr>');\
+    */\
+    \
+    htp.p('<br />');\
+    \
+    htp.p('<tr>');\
+    htp.p('<td CLASS="indefault">');\
+    htp.p('<SPAN class="newText">Ticket Status:  </SPAN>');\
+    htp.p('<SPAN class="newText">' || statusLabel ||'</SPAN>');\
+    htp.p('</td>');\
+    htp.p('</tr>');\
+    \
+    -- htp.p('</table>');\
+    htp.p('<p>');\
+    --htp.p('</DIV>'); \
+   \
+    htp.p('<br />');\
+    \
+    -- if student has ticket\
+    if statusLabel = 'Ticket' then\
+        --htp.p('<input type="submit" value="Submit">');\
+        htp.formsubmit(cname=>'p_ticketStatus',cvalue=>'Deactivate Ticket');\
+    \
+        if p_ticketStatus = 'Deactivate Ticket' then \
+            UPDATE ven_senproj1.gerattd\
+            SET GERATTD_FUNC_CODE = 'NOTICKETS'\
+            WHERE GERATTD_PIDM = pidm AND GERATTD_EVNT_CRN = output.slbevnt_crn AND GERATTD_FUNC_CODE = 'TICKETS';\
+            --htp.p('deactivate selected');\
+            --update the user's ticket status to 'NO TICKET' where it equals the current pidm and the current game code\
+            \
+        end if;\
+    -- student does not have ticket\
+    else\
+         --htp.p('<input type="submit" value="Submit">');\
+        htp.formsubmit(cname=>'p_ticketStatus',cvalue=>'Request Ticket');\
+    \
+        -- activate button selected\
+        if p_ticketStatus = 'Request Ticket' then \
+            --htp.p('request ticket selected');\
+            --check if the pidm already exists. if it does, then just update. else, insert\
+            \
+            SELECT COUNT(*) INTO currPIDMCount FROM ven_senproj1.gerattd WHERE GERATTD_PIDM = pidm AND GERATTD_EVNT_CRN = output.slbevnt_crn;\
+            \
+            if currPIDMCount = 0 then\
+                INSERT INTO ven_senproj1.gerattd(GERATTD_EVNT_CRN, GERATTD_FUNC_CODE, GERATTD_PIDM, GERATTD_TICKET_CNT, GERATTD_ACTIVITY_DATE)\
+                VALUES (output.slbevnt_crn, 'TICKETS', pidm, 1, sysdate);\
+            else\
+                UPDATE ven_senproj1.gerattd\
+                SET GERATTD_FUNC_CODE = 'TICKETS'\
+                WHERE GERATTD_PIDM = pidm AND GERATTD_EVNT_CRN = output.slbevnt_crn AND GERATTD_FUNC_CODE = 'NOTICKETS';\
+            end if;\
+            \
+            -- INSERT INTO ven_senproj1.gerattd(GERATTD_EVNT_CRN, GERATTD_FUNC_CODE, GERATTD_PIDM, GERATTD_TICKET_CNT) VALUES ('A5263', 'TICKETS', '527274', 1);\
+\
+        end if;\
+    end if;\
+    \
+    \
+    htp.p('<br />');\
+    htp.p('</DIV>'); \
+    \
+    htp.p('</table>');\
+    \
+        \
+    END LOOP;\
+    \
+    /*\
+    -- implement test button\
+    --htp.p('<input type="submit" value="Submit">');\
+    htp.formsubmit(cname=>'p_submit',cvalue=>'display');\
+    \
+    if p_submit = 'display' then \
+        htp.p('my name is nicole');\
+    end if;\
+    */\
+    \
+    htp.p('</table)');\
+    \
+    /*\
+    htp.p('<br />');\
+    \
+    htp.p('<div class="infotextdiv">');\
+    htp.p('<table\'a0\'a0CLASS="newForm" SUMMARY="This layout table contains information that may be helpful in understanding the content and functionality of this page.\'a0\'a0It could be a brief set of instructions, a description of error messages, or other special information.>');\
+    htp.p('<tr>');\
+    \
+    htp.p('<td CLASS="indefault">');\
+    htp.p('<SPAN class="newText"> Email your advisor : </SPAN>');\
+    htp.p('</td>');\
+    \
+    htp.p('</tr>');\
+    \
+    htp.p('</table>');\
+    htp.p('<p>');\
+    htp.p('</DIV>');\
+*/\
+    \
+    \
+    \
+   \
+    \
+    twbkwbis.P_CloseDoc;\
+  END GU_KennelNow;\
+END hwswknow;}

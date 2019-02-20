@@ -22,6 +22,7 @@ IS
   -- 1. Initial Complete Release                   SS 17-SEP-2015
   -- 2. Implemetation of prototype UI              SV 02-DEC-2018
   -- 3. Implementation of activation, deactivation and waitlist code    SV 08-FEB-2019
+  -- 4. Removed all tt_ references with local synonyms                  SS 14-FEB-2019
   ------------------------------------------------------------------------------------------------------
   ------------------------------------------------------------------------------------------------------
   /* Global type and variable declarations for package */
@@ -60,8 +61,9 @@ IS
       --getting all the games for a given season
       SELECT DISTINCT ssrmeet_start_date,
          a.*, ger.gerattd_func_code, ger.gerattd_RSVP_date 
-      FROM gonz.tt_slbevnt a
-      LEFT OUTER JOIN ven_senproj1.gerattd ger ON (ger.gerattd_evnt_crn = slbevnt_crn AND ger.gerattd_pidm = pidm), gonz.tt_ssrmeet
+      FROM slbevnt a -- local synonym created by tt_slbevnt SS 2/14/2019
+     -- FROM gonz.tt_slbevnt a   
+      LEFT OUTER JOIN ven_senproj1.gerattd ger ON (ger.gerattd_evnt_crn = slbevnt_crn AND ger.gerattd_pidm = pidm), ssrmeet
       WHERE slbevnt_desc LIKE 'MBB%' 
       --AND slbevnt_desc LIKE '%BYU%' 
       --OR slbevnt_desc LIKE '%Pepperdine%' )
@@ -91,9 +93,15 @@ IS
        -- htp.p(' <table width="1200" CLASS="datadisplaytable" summary="This table will contain game information"><caption class="captiontext">'||TO_CHAR(output.gerattd_RSVP_DATE, 'YYYY/MM/DD HH24:MI:SS')||'</caption>');
         
         
+        SELECT COUNT(*) INTO currPIDMCount FROM ven_senproj1.swrwait WHERE SWRWAIT_PIDM = pidm AND SWRWAIT_EVENT_CRN = output.slbevnt_crn AND SWRWAIT_FUNC_CODE = 'WAITLIST'; 
+              
+        -- if the student is on the waitlist for the game, display 'On Waitlist' as ticket status
+        if (currPIDMCount > 0) then
+            statusLabel := 'On Waitlist';
+        --else student is not on the  
         --checking to see if a student has or does not have a ticket to the game
         --changing their status lable accordingly
-        if (output.gerattd_func_code IS null OR output.gerattd_func_code = 'NOTICKETS') then
+        elsif (output.gerattd_func_code IS null OR output.gerattd_func_code = 'NOTICKETS') then
              statusLabel := 'No Ticket';
         else 
              statusLabel := 'Ticket';
@@ -158,6 +166,17 @@ IS
                 
                 --NOTIFY STUDENT THEY DO NOT HAVE A TICKET
                 
+                 v_message := 'You no longer have a ticket for the Gonzaga vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'') || 'basketball game.';
+                   
+                
+                 gokemal.p_send_email(p_from_addr=>'Studenttix<studenttix@gonzaga.edu>',--'GU Ticket Office<xyz@gonzaga.edu>' ,
+                    p_to_addr=>gzkinfo.gf_getemail(pidm,'GU'),--gwkcurr.GU_BestEmailAddr(p_pidm,'GU','EMAIL'),
+                    p_subject=>'Deactivated ticket to MBB vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,''),
+                    p_message=>v_message,  
+                    p_success_out=>v_success_out, 
+                    p_reply_out=>v_reply_out); 
+                
+                
                 SELECT COUNT(*) INTO currPIDMCount FROM ven_senproj1.swrwait WHERE SWRWAIT_EVENT_CRN = output.slbevnt_crn AND SWRWAIT_FUNC_CODE = 'WAITLIST'; 
                
                 -- if at least on person on the waitlist
@@ -203,9 +222,12 @@ IS
                     
                     
                     -- NOTIFY STUDENT THEY NOW HAVE A TICKET
-                    gokemal.p_send_email(p_from_addr=>'NICOLR <nhoward2@zagmail.gonzaga.edu>',--'GU Ticket Office<xyz@gonzaga.edu>' ,
-                    p_to_addr=>gzkinfo.gf_getemail(pidm,'GU'),--gwkcurr.GU_BestEmailAddr(p_pidm,'GU','EMAIL'),
-                    p_subject=>'You have a ticket',
+                    v_message := 'You now have a ticket for the Gonzaga vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'') || 'basketball game. You are no longer on the waitlist.';
+                 
+                    
+                    gokemal.p_send_email(p_from_addr=>'Studenttix<studenttix@gonzaga.edu>',--'GU Ticket Office<xyz@gonzaga.edu>' ,
+                    p_to_addr=>gzkinfo.gf_getemail(first_on_waitlist_pidm,'GU'),--gwkcurr.GU_BestEmailAddr(p_pidm,'GU','EMAIL'),
+                    p_subject=>' Activated ticket to MBB vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,''),
                     p_message=>v_message,  
                     p_success_out=>v_success_out, 
                     p_reply_out=>v_reply_out); 
@@ -222,7 +244,7 @@ IS
                 buttonName := 'Request Ticket For ' ||  REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'');
                 htp.formsubmit(cname=>'p_ticketStatus',cvalue=> buttonName);
             
-                 -- activate button selected
+                -- activate button selected
                 --change the ticket status so the student has a ticket
                 if p_ticketStatus = buttonName then 
                     --check if the pidm already exists. if it does, then just update. else, insert
@@ -238,9 +260,13 @@ IS
                     end if;
                     
                     -- notify student they have ticket
-                    gokemal.p_send_email(p_from_addr=>'NICOLR <nhoward2@zagmail.gonzaga.edu>',--'GU Ticket Office<xyz@gonzaga.edu>' ,
+                    
+                    v_message := 'You now have a ticket for the Gonzaga vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'') || 'basketball game.';
+                 
+                    
+                    gokemal.p_send_email(p_from_addr=>'Studenttix<studenttix@gonzaga.edu>',--'GU Ticket Office<xyz@gonzaga.edu>' ,
                     p_to_addr=>gzkinfo.gf_getemail(pidm,'GU'),--gwkcurr.GU_BestEmailAddr(p_pidm,'GU','EMAIL'),
-                    p_subject=>'You have a ticket',
+                    p_subject=>'You have a ticket to MBB vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,''),
                     p_message=>v_message,  
                     p_success_out=>v_success_out, 
                     p_reply_out=>v_reply_out); 
@@ -258,6 +284,19 @@ IS
                     --remove from the waitlist
                     UPDATE ven_senproj1.swrwait SET swrwait_func_code = 'NOWAITLIST'
                     WHERE pidm = swrwait_pidm AND swrwait_event_crn = output.slbevnt_crn;
+                    
+                    
+                    -- NOTIFY STUDENT THEY HAVE BEEN REMOVED FROM THE WAITLIST
+                     v_message := 'You are no longer on the waitlit for the Gonzaga vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'') || 'basketball game.';
+                 
+                    
+                    gokemal.p_send_email(p_from_addr=>'Studenttix<studenttix@gonzaga.edu>',--'GU Ticket Office<xyz@gonzaga.edu>' ,
+                    p_to_addr=>gzkinfo.gf_getemail(pidm,'GU'),--gwkcurr.GU_BestEmailAddr(p_pidm,'GU','EMAIL'),
+                    p_subject=>'Removed from the waitlist for MBB vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,''),
+                    p_message=>v_message,  
+                    p_success_out=>v_success_out, 
+                    p_reply_out=>v_reply_out); 
+                    
                  end if;
                
                --if the student is not on the waitlist  
@@ -277,6 +316,17 @@ IS
                         INSERT INTO ven_senproj1.SWRWAIT(SWRWAIT_EVENT_CRN, SWRWAIT_FUNC_CODE, SWRWAIT_PIDM, SWRWAIT_ACTIVITY_DATE)
                         VALUES (output.slbevnt_crn, 'WAITLIST', pidm, sysdate);
                     end if;
+                    
+                    -- NOTIFY STUDENT THEY ARE ADDED TO THE WAITLIST
+                    v_message := 'You have been added to the waitlist for the Gonzaga vs.' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'') || 'basketball game.';
+                    
+                    gokemal.p_send_email(p_from_addr=>'Studenttix<studenttix@gonzaga.edu>',--'GU Ticket Office<xyz@gonzaga.edu>' ,
+                    p_to_addr=>gzkinfo.gf_getemail(pidm,'GU'),--gwkcurr.GU_BestEmailAddr(p_pidm,'GU','EMAIL'),
+                    p_subject=>'Added to MBB vs. ' || REPLACE(REPLACE(output.slbevnt_DESC,'MBB vs ',''),18,'')||  ' waitlist',
+                    p_message=>v_message,  
+                    p_success_out=>v_success_out, 
+                    p_reply_out=>v_reply_out); 
+                    
                 end if;
                end if;
             end if;
@@ -362,9 +412,29 @@ IS
 
 
 
-  PROCEDURE GU_GameCreation IS
-  pidm spriden.spriden_pidm%type;
-  --need a cursor to display things
+  PROCEDURE GU_GameCreation (
+    p_submit IN VARCHAR2 DEFAULT NULL,
+    season IN VARCHAR2 DEFAULT NULL,
+    game_description IN VARCHAR2 DEFAULT NULL,
+    date_of_game IN VARCHAR2 DEFAULT NULL,
+    start_of_game IN VARCHAR2 DEFAULT NULL,
+    end_of_game IN VARCHAR2 DEFAULT NULL,
+    day_of_game IN VARCHAR2 DEFAULT NULL,
+    activation_period_start_date IN VARCHAR2 DEFAULT NULL,
+    activation_period_start_time IN VARCHAR2 DEFAULT NULL,
+    activation_period_end_date IN VARCHAR2 DEFAULT NULL,
+    activation_period_end_time IN VARCHAR2 DEFAULT NULL,
+    deactivation_period_end_date IN VARCHAR2 DEFAULT NULL,
+    deactivation_period_end_time IN VARCHAR2 DEFAULT NULL)
+
+  IS
+    pidm spriden.spriden_pidm%type;
+    evnt_description varchar2(50);
+    deactivation_end DATE;
+    activation_begin DATE;
+    activation_end DATE;
+    date_of_gam DATE;
+  
   BEGIN
     dbms_output.put_line(pidm);
     --checking to see if the user has a valid pidm
@@ -374,9 +444,7 @@ IS
     
     twbkwbis.P_OpenDoc('hwswknow.GU_GameCreation');
     htp.p('<form action="hwswknow.GU_GameCreation">');
-    
-    
-    
+        
     --creating the game creation form
     htp.p('<table  CLASS="plaintable" style="font-size:10pt;">');
     htp.p('<tr>');
@@ -391,34 +459,132 @@ IS
     htp.p('</TD>');
     htp.p('</tr>');
     htp.p('<tr>');
-    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Opponent</td>');
+    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Description</td>');
     htp.p('<TD CLASS="pldefault">');
-    htp.p('<input type="text" name="opponent" maxlength="9" />');
+    htp.p('<input type="text" name="game_description" maxlength="30" />');
     htp.p('</TD>');
     htp.p('</tr>');
+    
     htp.p('<tr>');
     htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Date</td>');
     htp.p('<TD CLASS="pldefault">');
     htp.p('<input type="text" name="date_of_game" maxlength="20" />');
     htp.p('</TD>');
     htp.p('</tr>');
+    
+    htp.p('<tr>');
+    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Start Time</td>');
+    htp.p('<TD CLASS="pldefault">');
+    htp.p('<input type="text" name="start_of_game" maxlength="20" />');
+    htp.p('</TD>');
+    htp.p('</tr>');
+    
+    htp.p('<tr>');
+    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">End Time</td>');
+    htp.p('<TD CLASS="pldefault">');
+    htp.p('<input type="text" name="end_of_game" maxlength="20" />');
+    htp.p('</TD>');
+    htp.p('</tr>');
+    
+    htp.p('<tr>');
+    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Day of Week</td>');
+    htp.p('<TD CLASS="pldefault">');
+    htp.p('<input type="text" name="day_of_game" maxlength="1" />');
+    htp.p('</TD>');
+    htp.p('</tr>');
+    
     htp.p('<tr>');
     htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Activation Period Start Date</td>');
+    htp.p('<TD CLASS="pldefault">');
+    htp.p('<input type="text" name="activation_period_start_date" maxlength="20" />');
+    htp.p('</TD>');
+    htp.p('</tr>');
+    
+    htp.p('<tr>');
+    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Activation Period Start Time</td>');
     htp.p('<TD CLASS="pldefault">');
     htp.p('<input type="text" name="activation_period_start_time" maxlength="20" />');
     htp.p('</TD>');
     htp.p('</tr>');
+    
     htp.p('<tr>');
     htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Activation Period End Date</td>');
+    htp.p('<TD CLASS="pldefault">');
+    htp.p('<input type="text" name="activation_period_end_date" maxlength="20" />');
+    htp.p('</TD>');
+    htp.p('</tr>');
+    
+    htp.p('<tr>');
+    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Activation Period End Time</td>');
     htp.p('<TD CLASS="pldefault">');
     htp.p('<input type="text" name="activation_period_end_time" maxlength="20" />');
     htp.p('</TD>');
     htp.p('</tr>');
+    
+    htp.p('<tr>');
+    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Deactivation Period End Date</td>');
+    htp.p('<TD CLASS="pldefault">');
+    htp.p('<input type="text" name="deactivation_period_end_date" maxlength="20" />');
+    htp.p('</TD>');
+    htp.p('</tr>');
+    
+    htp.p('<tr>');
+    htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">Deactivation Period End Time</td>');
+    htp.p('<TD CLASS="pldefault">');
+    htp.p('<input type="text" name="deactivation_period_end_time" maxlength="20" />');
+    htp.p('</TD>');
+    htp.p('</tr>');
+    
     htp.p('</table>');
     htp.p('<br>');
-    htp.p('<input type="submit" name="p_submit" value="Create Game" />');
+    
+    -- TODO: just added this because it looks like we used this above to make buttons go,
+    -- need to figure out if this works.
+    htp.formsubmit(cname=>'p_submit',cvalue=> 'Create Game');
     htp.p('<br><br>');
-
+    
+    
+    dbms_output.put_line('#1 BEFORE CLICKING BUTTON'); 
+    
+    -- if p_submit is "Create Game" then add the game to the necessary tables
+    if p_submit = 'Create Game' then
+    
+        dbms_output.put_line('#2 Clicked the button'); 
+    
+        -- concatenate info from form into data we can put in the tables
+        -- TODO: This probably isn't going to work unless format is literally perfect!
+        evnt_description :=  game_description || season;
+        
+        deactivation_end := TO_DATE(deactivation_period_end_date || ' ' || deactivation_period_end_time, 'YYYY-MM-DD HH24:MI:SS');
+        
+        activation_begin := TO_DATE(activation_period_start_date || ' ' || activation_period_start_time, 'YYYY-MM-DD HH24:MI:SS');
+        activation_end := TO_DATE(activation_period_end_date || ' ' || activation_period_end_time, 'YYYY-MM-DD HH24:MI:SS');
+        date_of_gam := TO_DATE(date_of_game, 'YYYY-MM-DD');
+        
+        htp.p('<td CLASS="pllabel"style="color:#003366; font-weight:bold;">'|| start_of_game|| ' '|| end_of_game|| ' '||SYSDATE ||' ' || date_of_gam ||'</td>');
+        -- add values neceessary for the ssrmeet
+        -- TODO: Need to have the day of week and do something about the crn!
+        insert into ssrmeet  --  SS 2/14/2019
+        --insert into ven_senproj1.tt_ssrmeet
+            (SSRMEET_TERM_CODE,SSRMEET_CRN, SSRMEET_BEGIN_TIME, SSRMEET_END_TIME, SSRMEET_ACTIVITY_DATE, 
+            SSRMEET_START_DATE,SSRMEET_END_DATE,SSRMEET_FUNC_CODE, SSRMEET_SURROGATE_ID,SSRMEET_VERSION)
+            VALUES ('EVENT','TTTLL', start_of_game, end_of_game, SYSDATE, date_of_gam, date_of_gam, 
+            'TICKETS',-1,0);
+        /*
+        -- Add values necessary for the slbevnt
+        -- TODO: Again need to do something about crn!
+          insert into slbevnt --  SS 2/14/2019
+        --insert into ven_senproj1.tt_slbevnt
+        (SLBEVNT_CRN, SLBEVNT_ETYP_CODE, SLBEVNT_DESC, SLBEVNT_ACTIVITY_DATE, SLBEVNT_SYSI_CODE, SLBEVNT_COMM_IND, SLBEVNT_SURROGATE_ID, SLBEVNT_VERSION, SLBEVNT_RESTRICTED_IND, SLBEVNT_PUBLISH_IND, SLBEVNT_LIMIT_ONE)
+        VALUES
+        ('TTTTT', 'ATHL', evnt_description, SYSDATE, 'S', 'N', -1, 0, 'N', 'N', 'N');
+        
+        -- add values necessary for the slbdist
+        -- TODO: Again need to do something about crn!
+        INSERT INTO ven_senproj1.slbdist values ('TTTTT', deactivation_end, activation_begin, activation_end);
+        */
+    end if;
+    
   END GU_GameCreation;
 END hwswknow;
 
